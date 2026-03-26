@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Master Data - HRIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1e1e1e; color: #e1e1e1; }
+        .card-bg { background-color: #252526; border: 1px solid #333; }
+        .input-bg { background-color: #3c3c3c; border: 1px solid #555; color: white; }
+        .tab-active { border-bottom: 2px solid #4fc1ff; color: #4fc1ff; font-weight: bold; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-[#4fc1ff]">System Master Data</h1>
+            <a href="/" class="text-sm text-gray-400 hover:text-white">← Dashboard</a>
+        </div>
+
+        <div class="card-bg p-4 rounded-xl mb-6 flex justify-between items-center border-l-4 border-yellow-500">
+            <div><h4 class="text-sm font-bold">Mata Uang</h4><p class="text-[10px] text-gray-500">Simbol penggajian global</p></div>
+            <select id="companyCurrency" onchange="updateCurrency(this.value)" class="input-bg px-4 py-1 rounded text-sm outline-none"></select>
+        </div>
+
+        <div class="flex gap-8 border-b border-gray-700 mb-6">
+            <button onclick="switchTab('employee')" id="tab-employee" class="pb-2 tab-active transition">Karyawan</button>
+            <button onclick="switchTab('position')" id="tab-position" class="pb-2 text-gray-400 transition">Jabatan</button>
+            <button onclick="switchTab('dept')" id="tab-dept" class="pb-2 text-gray-400 transition">Departemen</button>
+        </div>
+
+        <section id="sec-employee" class="tab-content">
+            <div class="flex justify-between mb-4">
+                <h2 class="font-bold">List Karyawan & Gaji</h2>
+                <button onclick="openEmpModal()" class="bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded text-xs font-bold">+ Tambah</button>
+            </div>
+            <div class="card-bg rounded-xl overflow-hidden shadow-lg">
+                <table class="w-full text-sm">
+                    <thead class="bg-[#333] text-[10px] uppercase text-gray-400">
+                        <tr><th class="p-4 text-left">NIK</th><th class="p-4 text-left">Nama</th><th class="p-4 text-left">Jabatan</th><th class="p-4 text-left">Gaji Pokok</th><th class="p-4 text-center">Aksi</th></tr>
+                    </thead>
+                    <tbody id="empTableBody" class="divide-y divide-gray-800"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="sec-position" class="tab-content hidden">
+            <div class="flex justify-between mb-4">
+                <h2 class="font-bold">Master Jabatan</h2>
+                <button onclick="openPosModal()" class="bg-green-600 px-4 py-1 rounded text-xs font-bold">+ Tambah</button>
+            </div>
+            <div class="card-bg rounded-xl overflow-hidden max-w-2xl">
+                <table class="w-full text-sm">
+                    <thead class="bg-[#333] text-[10px] uppercase text-gray-400">
+                        <tr><th class="p-4 text-left">Jabatan</th><th class="p-4 text-left">Departemen</th><th class="p-4 text-right">Aksi</th></tr>
+                    </thead>
+                    <tbody id="posTableBody" class="divide-y divide-gray-800"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="sec-dept" class="tab-content hidden">
+            <div class="flex justify-between mb-4">
+                <h2 class="font-bold">Master Departemen</h2>
+                <button onclick="openDeptModal()" class="bg-purple-600 px-4 py-1 rounded text-xs font-bold">+ Tambah</button>
+            </div>
+            <div class="card-bg rounded-xl overflow-hidden max-w-md">
+                <table class="w-full text-sm">
+                    <thead class="bg-[#333] text-[10px] uppercase text-gray-400">
+                        <tr><th class="p-4 text-left">Nama Departemen</th><th class="p-4 text-right">Aksi</th></tr>
+                    </thead>
+                    <tbody id="deptTableBody" class="divide-y divide-gray-800"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div id="modal-emp" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+        <div class="card-bg w-full max-w-md p-6 rounded-2xl border border-gray-700">
+            <h3 class="text-xl font-bold mb-6 text-[#4fc1ff]">Form Karyawan</h3>
+            <form id="form-emp" class="space-y-4">
+                <input type="hidden" id="edit-id">
+                <input type="text" id="nik" placeholder="NIK (Username Login)" required class="input-bg w-full p-2 rounded text-sm">
+                <input type="text" id="name" placeholder="Nama Lengkap" required class="input-bg w-full p-2 rounded text-sm">
+                <input type="email" id="email" placeholder="Email" required class="input-bg w-full p-2 rounded text-sm">
+                <select id="sel-pos" class="input-bg w-full p-2 rounded text-sm" required></select>
+                <input type="number" id="basic_salary" placeholder="Gaji Pokok" required class="input-bg w-full p-2 rounded text-sm font-bold text-green-400">
+                <select id="role" class="input-bg w-full p-2 rounded text-sm">
+                    <option value="staff">staff</option>
+                    <option value="manager">manager</option>
+                    <option value="superadmin">superadmin</option>
+                </select>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" onclick="closeModal('modal-emp')" class="text-gray-400">Batal</button>
+                    <button type="submit" class="bg-blue-600 px-6 py-2 rounded-lg font-bold">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-pos" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+        <div class="card-bg w-full max-w-sm p-6 rounded-2xl shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-green-400">Tambah Jabatan</h3>
+            <form id="form-pos" class="space-y-4">
+                <input type="text" id="pos_name" placeholder="Nama Jabatan" required class="input-bg w-full p-2 rounded text-sm">
+                <select id="sel-dept-pos" class="input-bg w-full p-2 rounded text-sm" required></select>
+                <div class="flex justify-end gap-3"><button type="button" onclick="closeModal('modal-pos')" class="text-gray-400">Batal</button><button type="submit" class="bg-green-600 px-6 py-2 rounded-lg font-bold">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-dept" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+        <div class="card-bg w-full max-w-sm p-6 rounded-2xl shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-purple-400">Tambah Departemen</h3>
+            <form id="form-dept" class="space-y-4">
+                <input type="text" id="dept_name" placeholder="Nama Departemen" required class="input-bg w-full p-2 rounded text-sm">
+                <div class="flex justify-end gap-3"><button type="button" onclick="closeModal('modal-dept')" class="text-gray-400">Batal</button><button type="submit" class="bg-purple-600 px-6 py-2 rounded-lg font-bold">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('hris_token');
+        let currentCurrency = 'IDR';
+
+        async function init() {
+            const resC = await fetch('/api/master/currency', { headers: {'Authorization': `Bearer ${token}`} });
+            const { currency } = await resC.json();
+            currentCurrency = currency;
+            const selC = document.getElementById('companyCurrency');
+            ['IDR','USD','SGD','EUR','MYR'].forEach(c => selC.innerHTML += `<option value="${c}" ${c===currency?'selected':''}>${c}</option>`);
+            switchTab('employee');
+        }
+
+        async function updateCurrency(val) {
+            await fetch('/api/master/currency', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({currency: val}) });
+            location.reload();
+        }
+
+        function switchTab(type) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('button[id^="tab-"]').forEach(b => b.classList.remove('tab-active','text-[#4fc1ff]'));
+            document.getElementById(`sec-${type}`).classList.remove('hidden');
+            document.getElementById(`tab-${type}`).classList.add('tab-active');
+            loadData(type);
+        }
+
+        // Ganti fungsi loadData Anda dengan ini
+async function loadData(type) {
+    const h = {'Authorization': `Bearer ${token}`};
+    
+    // Sinkronisasi Endpoint [cite: 66, 67]
+    let endpoint = '';
+    if (type === 'employee') endpoint = 'employees';
+    else if (type === 'position') endpoint = 'positions';
+    else if (type === 'dept') endpoint = 'departments'; // Perbaikan: tadinya type + 's' (depts)
+
+    const res = await fetch(`/api/master/${endpoint}`, { headers: h });
+    const d = await res.json();
+    
+    if(type === 'employee') {
+        document.getElementById('empTableBody').innerHTML = d.map(e => `
+            <tr>
+                <td class="p-4 text-xs font-mono text-gray-500">${e.nik}</td>
+                <td class="p-4 font-bold">${e.name}</td>
+                <td class="p-4 text-xs">${e.position_name || '-'} (${e.department_name || '-'})</td>
+                <td class="p-4 text-green-400 font-mono">${formatMoney(e.basic_salary)}</td>
+                <td class="p-4 text-center">
+                    <button onclick='prepareEdit(${JSON.stringify(e)})' class="text-blue-400 mr-3">Edit</button>
+                    <button onclick="del('employees', ${e.id})" class="text-red-500">Hapus</button>
+                </td>
+            </tr>
+        `).join('');
+    } else if(type === 'position') {
+        document.getElementById('posTableBody').innerHTML = d.map(p => `
+            <tr>
+                <td class="p-4 font-bold">${p.position_name}</td>
+                <td class="p-4 text-xs text-gray-400">${p.department_name || '-'}</td>
+                <td class="p-4 text-right">
+                    <button onclick="del('positions', ${p.id})" class="text-red-500">Hapus</button>
+                </td>
+            </tr>`).join('');
+    } else if(type === 'dept') {
+        document.getElementById('deptTableBody').innerHTML = d.map(dept => `
+            <tr>
+                <td class="p-4 font-bold text-[#4fc1ff]">${dept.department_name}</td>
+                <td class="p-4 text-right">
+                    <button onclick="del('departments', ${dept.id})" class="text-red-500">Hapus</button>
+                </td>
+            </tr>`).join('');
+    }
+}
+
+// Fungsi Hapus yang disinkronkan dengan rute Backend
+async function del(route, id) {
+    if(confirm('Hapus data?')) {
+        // Gunakan route yang sesuai (employees, positions, departments) 
+        const endpoint = route === 'dept' ? 'departments' : route;
+        await fetch(`/api/master/${endpoint}/${id}`, { 
+            method: 'DELETE', 
+            headers: {'Authorization': `Bearer ${token}`} 
+        });
+        
+        // Refresh tab aktif
+        const activeTab = route === 'employees' ? 'employee' : (route === 'positions' ? 'position' : 'dept');
+        loadData(activeTab);
+    }
+}
+
+        function formatMoney(amount) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: currentCurrency, minimumFractionDigits: 0 }).format(amount);
+        }
+
+        // --- MODAL HELPERS ---
+        async function openEmpModal() {
+            const r = await fetch('/api/master/positions', { headers: {'Authorization': `Bearer ${token}`} });
+            const pos = await r.json();
+            document.getElementById('sel-pos').innerHTML = pos.map(p => `<option value="${p.id}">${p.position_name} (${p.department_name})</option>`).join('');
+            document.getElementById('form-emp').reset();
+            document.getElementById('edit-id').value = '';
+            document.querySelector('#modal-emp h3').textContent = 'Tambah Karyawan Baru';
+            document.getElementById('modal-emp').style.display = 'flex';
+        }
+
+        async function openPosModal() {
+            const r = await fetch('/api/master/departments', { headers: {'Authorization': `Bearer ${token}`} });
+            const depts = await r.json();
+            document.getElementById('sel-dept-pos').innerHTML = depts.map(d => `<option value="${d.id}">${d.department_name}</option>`).join('');
+            document.getElementById('modal-pos').style.display = 'flex';
+        }
+
+        function openDeptModal() { document.getElementById('modal-dept').style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- SUBMIT HANDLERS ---
+        document.getElementById('form-dept').onsubmit = async (e) => {
+            e.preventDefault();
+            await fetch('/api/master/departments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ department_name: document.getElementById('dept_name').value })
+            });
+            closeModal('modal-dept'); loadData('dept');
+        };
+
+        document.getElementById('form-pos').onsubmit = async (e) => {
+            e.preventDefault();
+            await fetch('/api/master/positions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    position_name: document.getElementById('pos_name').value,
+                    department_id: document.getElementById('sel-dept-pos').value 
+                })
+            });
+            closeModal('modal-pos'); loadData('position');
+        };
+
+        document.getElementById('form-emp').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const payload = { 
+                nik: document.getElementById('nik').value, name: document.getElementById('name').value, 
+                email: document.getElementById('email').value, position_id: document.getElementById('sel-pos').value, 
+                role: document.getElementById('role').value, basic_salary: document.getElementById('basic_salary').value 
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/master/employees/${id}` : '/api/master/employees';
+
+            await fetch(url, { method, headers: {'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body: JSON.stringify(payload) });
+            closeModal('modal-emp'); loadData('employee');
+        };
+
+        function prepareEdit(e) {
+            openEmpModal().then(() => {
+                document.getElementById('edit-id').value = e.id;
+                document.getElementById('nik').value = e.nik;
+                document.getElementById('name').value = e.name;
+                document.getElementById('email').value = e.email;
+                document.getElementById('basic_salary').value = e.basic_salary;
+                document.getElementById('role').value = e.role;
+                document.getElementById('sel-pos').value = e.position_id;
+                document.querySelector('#modal-emp h3').textContent = 'Edit Data Karyawan';
+            });
+        }
+
+        async function del(route, id) {
+            if(confirm('Hapus data ini?')) {
+                const res = await fetch(`/api/master/${route}/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+                const result = await res.json();
+                alert(result.message);
+                loadData(route === 'employees' ? 'employee' : (route === 'positions' ? 'position' : 'dept'));
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

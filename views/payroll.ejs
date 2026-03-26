@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Payroll Management - HRIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1e1e1e; color: #e1e1e1; }
+        .card-bg { background-color: #252526; border: 1px solid #333; }
+        .text-accent { color: #4fc1ff; }
+        .input-bg { background-color: #3c3c3c; border: 1px solid #555; color: white; }
+        .table-input { background-color: #2d2d2d; border: 1px solid #444; color: #4fc1ff; padding: 4px 8px; border-radius: 4px; width: 110px; text-align: right; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
+            <div class="flex items-center gap-4">
+                <button onclick="window.history.back()" class="bg-gray-800 border border-gray-700 rounded px-4 py-2 text-xs hover:bg-gray-700">← Kembali</button>
+                <h1 class="text-2xl font-bold text-accent">Payroll Management</h1>
+            </div>
+            
+            <div id="adminActions" class="hidden flex gap-2">
+                <input type="number" id="bonusRate" placeholder="Rate Bonus" class="input-bg px-3 py-2 rounded text-xs w-28">
+                <input type="number" id="penaltyRate" placeholder="Rate Potong" class="input-bg px-3 py-2 rounded text-xs w-28">
+                <select id="monthSelect" onchange="loadPayroll()" class="bg-gray-800 border border-gray-700 rounded px-3 text-sm">
+                    <option value="January">Januari</option><option value="February">Februari</option><option value="March">Maret</option>
+                    <option value="April">April</option><option value="May">Mei</option><option value="June">Juni</option>
+                    <option value="July">Juli</option><option value="August">Agustus</option><option value="September">September</option>
+                    <option value="October">Oktober</option><option value="November">November</option><option value="December">Desember</option>
+                </select>
+                <button onclick="calculatePreview()" class="bg-blue-600 px-4 py-2 rounded text-xs font-bold hover:bg-blue-500 transition">Generate Preview</button>
+                <button id="btnSaveFinal" onclick="saveFinalPayroll()" class="hidden bg-green-600 px-4 py-2 rounded text-xs font-bold hover:bg-green-500 transition">Simpan Payroll</button>
+            </div>
+        </div>
+
+        <div class="card-bg p-6 rounded-2xl mb-6 border-l-4 border-accent shadow-lg">
+            <h4 class="text-xs text-gray-400 uppercase tracking-widest mb-1">Total Kewajiban Payroll Perusahaan</h4>
+            <p id="grandTotal" class="text-4xl font-bold text-white">Rp 0</p>
+        </div>
+
+        <div class="card-bg rounded-xl overflow-hidden shadow-xl border border-gray-800">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-[#333] text-gray-400 uppercase text-[10px] tracking-widest">
+                    <tr>
+                        <th class="px-6 py-4">Karyawan</th>
+                        <th class="px-6 py-4">Gaji Pokok</th>
+                        <th class="px-6 py-4 text-green-400">Bonus</th>
+                        <th class="px-6 py-4 text-red-400">Potongan</th>
+                        <th class="px-6 py-4 font-bold">Total Gaji</th>
+                    </tr>
+                </thead>
+                <tbody id="payrollTableBody" class="divide-y divide-gray-700"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('hris_token');
+        const user = JSON.parse(localStorage.getItem('hris_user'));
+
+        if(user && user.role.toLowerCase() === 'superadmin') {
+            document.getElementById('adminActions').classList.remove('hidden');
+        }
+
+        // FUNGSI LOAD HISTORY
+        async function loadPayroll() {
+            const month = document.getElementById('monthSelect').value;
+            const year = new Date().getFullYear();
+            document.getElementById('btnSaveFinal').classList.add('hidden');
+
+            const res = await fetch(`/api/payroll/history?month=${month}&year=${year}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            renderTable(data, false);
+        }
+
+        // FUNGSI GENERATE PREVIEW
+        async function calculatePreview() {
+            const month = document.getElementById('monthSelect').value;
+            const year = new Date().getFullYear();
+            const res = await fetch('/api/payroll/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    month, year, 
+                    defaultBonus: document.getElementById('bonusRate').value || 0,
+                    defaultPenalty: document.getElementById('penaltyRate').value || 0 
+                })
+            });
+            const data = await res.json();
+            renderTable(data, true);
+            document.getElementById('btnSaveFinal').classList.remove('hidden');
+        }
+
+        // RENDER TABLE DENGAN PENJUMLAHAN AKURAT
+        function renderTable(data, isEditable) {
+            const tbody = document.getElementById('payrollTableBody');
+            if(!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-gray-500 italic">Data tidak ditemukan.</td></tr>';
+                document.getElementById('grandTotal').textContent = "Rp 0";
+                return;
+            }
+
+            tbody.innerHTML = data.map(p => `
+                <tr class="hover:bg-white/5 transition payroll-row" data-emp-id="${p.employee_id}">
+                    <td class="px-6 py-4 font-bold">${p.name}<br><span class="text-[10px] text-gray-500 font-normal">${p.nik}</span></td>
+                    <td class="px-6 py-4">
+                        <input type="hidden" class="row-basic" value="${p.basic_salary}">
+                        Rp ${new Intl.NumberFormat().format(p.basic_salary)}
+                    </td>
+                    <td class="px-6 py-4">
+                        ${isEditable ? 
+                            `<input type="number" class="table-input row-bonus" value="${p.attendance_bonus}" oninput="updateRowTotal(this)">` : 
+                            `<span class="row-bonus-val" data-val="${p.attendance_bonus}">Rp ${new Intl.NumberFormat().format(p.attendance_bonus)}</span>`}
+                    </td>
+                    <td class="px-6 py-4">
+                        ${isEditable ? 
+                            `<input type="number" class="table-input row-penalty" value="${p.late_deduction}" oninput="updateRowTotal(this)">` : 
+                            `<span class="row-penalty-val" data-val="${p.late_deduction}">Rp ${new Intl.NumberFormat().format(p.late_deduction)}</span>`}
+                    </td>
+                    <td class="px-6 py-4 font-bold text-accent row-total-display">Rp ${new Intl.NumberFormat().format(p.total_salary)}</td>
+                </tr>
+            `).join('');
+            updateGrandTotal();
+        }
+
+        // UPDATE BARIS (SAAT EDIT)
+        function updateRowTotal(input) {
+            const row = input.closest('.payroll-row');
+            const basic = parseFloat(row.querySelector('.row-basic').value) || 0;
+            const bonus = parseFloat(row.querySelector('.row-bonus').value) || 0;
+            const penalty = parseFloat(row.querySelector('.row-penalty').value) || 0;
+            
+            const total = basic + bonus - penalty;
+            row.querySelector('.row-total-display').textContent = "Rp " + new Intl.NumberFormat().format(total);
+            updateGrandTotal();
+        }
+
+        // HITUNG GRAND TOTAL (MENGGUNAKAN ATRIBUT DATA AGAR AKURAT)
+        function updateGrandTotal() {
+            let grandTotal = 0;
+            const rows = document.querySelectorAll('.payroll-row');
+            
+            rows.forEach(row => {
+                const basic = parseFloat(row.querySelector('.row-basic').value) || 0;
+                let bonus = 0;
+                let penalty = 0;
+
+                const bonusInput = row.querySelector('.row-bonus');
+                const penaltyInput = row.querySelector('.row-penalty');
+
+                if(bonusInput) { // Mode Edit
+                    bonus = parseFloat(bonusInput.value) || 0;
+                    penalty = parseFloat(penaltyInput.value) || 0;
+                } else { // Mode History
+                    bonus = parseFloat(row.querySelector('.row-bonus-val').dataset.val) || 0;
+                    penalty = parseFloat(row.querySelector('.row-penalty-val').dataset.val) || 0;
+                }
+
+                grandTotal += (basic + bonus - penalty);
+            });
+
+            document.getElementById('grandTotal').textContent = "Rp " + new Intl.NumberFormat().format(grandTotal);
+        }
+
+        // SIMPAN KE DATABASE
+        async function saveFinalPayroll() {
+            const month = document.getElementById('monthSelect').value;
+            const year = new Date().getFullYear();
+            
+            const data = Array.from(document.querySelectorAll('.payroll-row')).map(row => {
+                const basic = parseFloat(row.querySelector('.row-basic').value);
+                const bonus = parseFloat(row.querySelector('.row-bonus').value) || 0;
+                const penalty = parseFloat(row.querySelector('.row-penalty').value) || 0;
+                return {
+                    employee_id: row.getAttribute('data-emp-id'),
+                    basic_salary: basic,
+                    attendance_bonus: bonus,
+                    late_deduction: penalty,
+                    total_salary: basic + bonus - penalty
+                };
+            });
+
+            const res = await fetch('/api/payroll/save-batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ period: `${month} ${year}`, data })
+            });
+            const result = await res.json();
+            alert(result.message);
+            loadPayroll();
+        }
+
+        loadPayroll();
+    </script>
+</body>
+</html>

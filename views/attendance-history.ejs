@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Absensi - HRIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1e1e1e; }
+        .card-bg { background-color: #252526; border: 1px solid #333; }
+        .text-accent { color: #4fc1ff; }
+        .input-bg { background-color: #3c3c3c; border: 1px solid #555; }
+        /* Modal Backdrop */
+        .modal-active { display: flex !important; }
+    </style>
+    <script>
+        const token = localStorage.getItem('hris_token');
+        if (!token) window.location.href = '/login';
+    </script>
+</head>
+<body class="text-gray-200 font-sans min-h-screen pb-10">
+
+    <nav class="card-bg p-4 sticky top-0 z-10 shadow-md border-b-2 border-[#007acc]">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-accent">Data Absensi</h1>
+            <a href="/" class="text-sm border border-gray-500 hover:border-white px-3 py-1 rounded transition">← Kembali</a>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto mt-6 px-4">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+            <input type="text" id="searchInput" class="input-bg w-full md:w-1/3 px-4 py-2 rounded-lg text-sm text-white" placeholder="🔍 Cari nama atau tanggal...">
+            <button onclick="exportTableToCSV('Laporan_Absensi.csv')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold w-full md:w-auto">📊 Export CSV</button>
+        </div>
+
+        <div class="card-bg rounded-xl overflow-hidden shadow-lg border border-gray-700">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap" id="attendanceTable">
+                    <thead class="bg-[#333333] text-gray-300 uppercase font-semibold text-xs">
+                        <tr>
+                            <th class="px-6 py-4">Tanggal</th>
+                            <th id="colName" class="px-6 py-4 hidden">Nama</th>
+                            <th class="px-6 py-4">Masuk</th>
+                            <th class="px-6 py-4">Pulang</th>
+                            <th class="px-6 py-4">Status</th>
+                            <th class="px-6 py-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-700">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="detailModal" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4">
+        <div class="card-bg w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-gray-600 animate-in fade-in zoom-in duration-300">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-[#2d2d30]">
+                <h3 class="font-bold text-accent">Detail Absensi</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-6 overflow-y-auto max-h-[80vh]">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400 mb-2">Foto Masuk</p>
+                        <img id="modalImgIn" src="" class="rounded-lg border border-gray-600 w-full h-40 object-cover bg-gray-800" alt="No Photo">
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400 mb-2">Foto Pulang</p>
+                        <img id="modalImgOut" src="" class="rounded-lg border border-gray-600 w-full h-40 object-cover bg-gray-800" alt="No Photo">
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="bg-[#1e1e1e] p-4 rounded-xl border border-gray-700">
+                        <p class="text-xs text-gray-400 mb-2 uppercase tracking-widest">Titik Koordinat & Peta</p>
+                        <div id="locationLinks" class="flex flex-col gap-2">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = JSON.parse(localStorage.getItem('hris_user'));
+            const isAdmin = user.role === 'superadmin';
+            if (isAdmin) document.getElementById('colName').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/attendance/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allData = await response.json();
+                renderTable(allData, isAdmin);
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
+        function renderTable(data, isAdmin) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach((record, index) => {
+                const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const formatTanggal = new Date(record.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-[#2d2d30] transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4">${formatTanggal}</td>
+                    ${isAdmin ? `<td class="px-6 py-4 text-accent font-semibold">${record.employee_name}</td>` : ''}
+                    <td class="px-6 py-4 font-mono">${formatTime(record.clock_in_time)}</td>
+                    <td class="px-6 py-4 font-mono">${formatTime(record.clock_out_time)}</td>
+                    <td class="px-6 py-4"><span class="bg-green-900/40 text-green-400 px-2 py-1 rounded text-xs">Hadir</span></td>
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="showDetail(${index})" class="text-xs bg-[#007acc] hover:bg-[#005f9e] text-white px-3 py-1.5 rounded-md font-medium transition">
+                            Lihat Detail
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+       function showDetail(index) {
+    const item = allData[index];
+    
+    // Set Foto
+    document.getElementById('modalImgIn').src = item.clock_in_photo || '/img/no-photo.png';
+    document.getElementById('modalImgOut').src = item.clock_out_photo || '/img/no-photo.png';
+    
+    const locDiv = document.getElementById('locationLinks');
+    
+    // Logika Menampilkan Map Visual (Iframe)
+    // Titik Masuk
+    let mapsHtml = `
+        <div class="mb-4">
+            <p class="text-[10px] text-green-400 mb-1 font-bold uppercase">📍 Lokasi Presensi Masuk</p>
+            <iframe 
+                width="100%" 
+                height="150" 
+                frameborder="0" 
+                style="border:0; border-radius: 8px;" 
+                src="https://maps.google.com/maps?q=${item.clock_in_lat},${item.clock_in_long}&z=15&output=embed">
+            </iframe>
+        </div>
+    `;
+
+    // Titik Pulang (Jika sudah ada)
+    if (item.clock_out_lat) {
+        mapsHtml += `
+            <div>
+                <p class="text-[10px] text-red-400 mb-1 font-bold uppercase">📍 Lokasi Presensi Pulang</p>
+                <iframe 
+                    width="100%" 
+                    height="150" 
+                    frameborder="0" 
+                    style="border:0; border-radius: 8px;" 
+                    src="https://maps.google.com/maps?q=${item.clock_out_lat},${item.clock_out_long}&z=15&output=embed">
+                </iframe>
+            </div>
+        `;
+    } else {
+        mapsHtml += `<p class="text-xs text-gray-500 italic text-center py-4">Belum ada data lokasi pulang</p>`;
+    }
+
+    locDiv.innerHTML = mapsHtml;
+    
+    // Tampilkan Modal
+    document.getElementById('detailModal').classList.add('modal-active');
+}
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('modal-active');
+        }
+
+        // Search & Export (Sama seperti sebelumnya)
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            document.querySelectorAll("#tableBody tr").forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";
+            });
+        });
+
+        function exportTableToCSV(f) { /* ... kode export sebelumnya ... */ }
+    </script>
+</body>
+</html>

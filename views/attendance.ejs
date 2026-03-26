@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi - HRIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1e1e1e; }
+        .card-bg { background-color: #252526; border: 1px solid #333; }
+        .text-accent { color: #4fc1ff; }
+        .btn-blue { background-color: #007acc; color: white; }
+        .btn-blue:hover { background-color: #005f9e; }
+        .btn-blue:disabled { background-color: #555; cursor: not-allowed; }
+        video { transform: scaleX(-1); } /* Efek cermin untuk kamera depan */
+    </style>
+    <script>
+        const token = localStorage.getItem('hris_token');
+        if (!token) window.location.href = '/login';
+    </script>
+</head>
+<body class="text-gray-200 font-sans min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="card-bg p-6 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-[#007acc]">
+        
+        <div class="flex justify-between items-center mb-4">
+            <h2 id="pageTitle" class="text-xl font-bold text-accent">Absensi Live</h2>
+            <a href="/" class="text-sm text-gray-400 hover:text-white transition">← Kembali</a>
+        </div>
+
+        <div class="text-center mb-6 bg-[#1e1e1e] py-3 rounded-lg border border-gray-700">
+            <p id="realtimeDate" class="text-sm text-gray-400 font-medium"></p>
+            <p id="realtimeClock" class="text-4xl font-mono font-bold text-white tracking-widest mt-1"></p>
+        </div>
+
+        <div class="relative bg-black rounded-lg overflow-hidden h-64 mb-4 flex justify-center items-center">
+            <video id="camera" autoplay playsinline class="object-cover w-full h-full"></video>
+            <canvas id="canvas" class="hidden"></canvas>
+            <p id="camStatus" class="absolute text-sm text-gray-400">Meminta akses kamera & lokasi...</p>
+        </div>
+
+        <div class="bg-[#1e1e1e] p-3 rounded-lg border border-gray-700 mb-6 text-sm text-center">
+            <span id="locStatus">📍 Mencari lokasi Anda...</span>
+        </div>
+
+        <button id="btnClockIn" disabled class="btn-blue w-full py-3 rounded-lg font-bold tracking-wide transition-all shadow-lg flex justify-center items-center gap-2">
+            📸 Memuat...
+        </button>
+
+        <p id="systemMsg" class="mt-4 text-center text-sm hidden"></p>
+    </div>
+
+    <script>
+        // --- LOGIKA JAM REALTIME ---
+        function updateClock() {
+            const now = new Date();
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            document.getElementById('realtimeClock').textContent = now.toLocaleTimeString('id-ID', timeOptions);
+            const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            document.getElementById('realtimeDate').textContent = now.toLocaleDateString('id-ID', dateOptions);
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // --- DETEKSI TIPE ABSENSI DARI URL ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const type = urlParams.get('type') || 'in'; 
+        
+        const btnClockIn = document.getElementById('btnClockIn');
+        document.getElementById('pageTitle').textContent = type === 'in' ? 'Absensi Masuk' : 'Absensi Pulang';
+        btnClockIn.innerHTML = type === 'in' ? '📸 Clock-In Sekarang' : '📸 Clock-Out Sekarang';
+
+        // --- DEKLARASI ELEMEN ---
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+        const locStatus = document.getElementById('locStatus');
+        const camStatus = document.getElementById('camStatus');
+        const systemMsg = document.getElementById('systemMsg');
+        
+        let userLat = null;
+        let userLong = null;
+
+        // 1. Dapatkan Lokasi GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLat = position.coords.latitude;
+                    userLong = position.coords.longitude;
+                    locStatus.innerHTML = `📍 Koordinat: <span class="text-green-400">${userLat.toFixed(5)}, ${userLong.toFixed(5)}</span>`;
+                    checkReady();
+                },
+                (error) => {
+                    locStatus.innerHTML = `❌ Gagal mengambil lokasi. Pastikan GPS aktif.`;
+                }
+            );
+        } else {
+            locStatus.innerHTML = `❌ Browser tidak mendukung GPS.`;
+        }
+
+        // 2. Akses Kamera Depan
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+            .then((stream) => {
+                video.srcObject = stream;
+                camStatus.classList.add('hidden');
+                checkReady();
+            })
+            .catch((err) => {
+                camStatus.textContent = '❌ Akses Kamera Ditolak!';
+            });
+
+        // 3. Validasi: Tombol aktif jika GPS & Kamera ready
+        function checkReady() {
+            if (userLat !== null && video.srcObject !== null) {
+                btnClockIn.disabled = false;
+            }
+        }
+
+        // 4. Aksi Klik Tombol Absen
+        btnClockIn.addEventListener('click', async () => {
+            btnClockIn.disabled = true;
+            btnClockIn.textContent = 'Memproses...';
+
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const photoData = canvas.toDataURL('image/jpeg', 0.8);
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+            // --- BAGIAN INI YANG MEMBEDAKAN MASUK DAN PULANG ---
+            const apiUrl = type === 'in' ? '/api/attendance/clock-in' : '/api/attendance/clock-out';
+            const apiMethod = type === 'in' ? 'POST' : 'PUT';
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: apiMethod, // Otomatis menjadi PUT jika absen pulang
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({
+                        lat: userLat,
+                        long: userLong,
+                        timezone: userTimezone,
+                        photo: photoData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    systemMsg.className = "mt-4 text-center text-sm text-green-400 font-bold block";
+                    systemMsg.textContent = type === 'in' ? "✅ Absen Masuk Berhasil!" : "✅ Absen Pulang Berhasil!";
+                    setTimeout(() => window.location.href = '/', 2000); 
+                } else {
+                    systemMsg.className = "mt-4 text-center text-sm text-red-400 block";
+                    systemMsg.textContent = data.message;
+                    btnClockIn.disabled = false;
+                    btnClockIn.innerHTML = type === 'in' ? '📸 Coba Lagi (Clock-In)' : '📸 Coba Lagi (Clock-Out)';
+                }
+            } catch (error) {
+                systemMsg.className = "mt-4 text-center text-sm text-red-400 block";
+                systemMsg.textContent = "Terjadi kesalahan koneksi jaringan.";
+                btnClockIn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

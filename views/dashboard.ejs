@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - HRIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1e1e1e; }
+        .card-bg { background-color: #252526; border: 1px solid #333; }
+        .text-accent { color: #4fc1ff; }
+    </style>
+    <script>
+        const token = localStorage.getItem("hris_token");
+        if (!token) window.location.href = "/login";
+    </script>
+</head>
+
+<body class="text-gray-200 font-sans min-h-screen pb-10">
+    <nav class="card-bg p-4 sticky top-0 z-10 shadow-md border-b-2 border-[#007acc]">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-accent">HRIS System</h1>
+            <button onclick="logout()" class="text-sm border border-gray-500 hover:border-white px-3 py-1 rounded">
+                Logout
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto mt-6 px-4">
+        <div class="card-bg p-6 rounded-xl mb-6 flex flex-col sm:flex-row items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold mb-1">
+                    Halo, <span id="userName" class="text-accent">User</span>! 👋
+                </h2>
+                <p class="text-gray-400 text-sm">
+                    Role: <span id="userRole" class="uppercase font-semibold text-gray-300"></span>
+                </p>
+            </div>
+            <div class="text-center sm:text-right bg-[#1e1e1e] p-3 rounded-lg border border-gray-700 w-full sm:w-auto">
+                <p class="text-xs text-gray-400 mb-1">Tanggal Hari Ini</p>
+                <p id="currentDate" class="font-mono text-lg"></p>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-semibold mb-3 text-gray-300 border-b border-gray-700 pb-2">
+            Status Kehadiran Hari Ini
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="card-bg p-5 rounded-xl flex items-center justify-between border-l-4 border-green-500">
+                <div class="flex items-center gap-4">
+                    <div class="bg-green-500/20 p-3 rounded-full text-green-400 text-xl">🏃</div>
+                    <div>
+                        <p class="text-xs text-gray-400 mb-1">Jam Masuk</p>
+                        <p id="timeIn" class="text-2xl font-bold font-mono text-white">--:--:--</p>
+                    </div>
+                </div>
+                <button id="btnIn" onclick="window.location.href = '/attendance?type=in'"
+                    class="hidden bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition">
+                    📸 Absen Masuk
+                </button>
+            </div>
+
+            <div class="card-bg p-5 rounded-xl flex items-center justify-between border-l-4 border-red-500">
+                <div class="flex items-center gap-4">
+                    <div class="bg-red-500/20 p-3 rounded-full text-red-400 text-xl">🚶</div>
+                    <div>
+                        <p class="text-xs text-gray-400 mb-1">Jam Pulang</p>
+                        <p id="timeOut" class="text-2xl font-bold font-mono text-white">--:--:--</p>
+                    </div>
+                </div>
+                <button id="btnOut" onclick="window.location.href = '/attendance?type=out'"
+                    class="hidden bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition">
+                    📸 Absen Pulang
+                </button>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-semibold mb-3 text-gray-300 border-b border-gray-700 pb-2">Menu Utama</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="window.location.href='/attendance-history'"
+                class="card-bg p-5 rounded-xl hover:bg-[#2d2d30] transition flex flex-col items-center justify-center gap-3">
+                <div class="bg-yellow-500 bg-opacity-20 p-3 rounded-full text-yellow-400">🗂️</div>
+                <span class="text-sm font-medium">Data Absensi</span>
+            </button>
+
+            <button id="btnUserManagement" onclick="window.location.href='/users'"
+                class="hidden card-bg p-5 rounded-xl hover:bg-[#2d2d30] transition flex flex-col items-center justify-center gap-3 border border-blue-900/30">
+                <div class="bg-blue-500 bg-opacity-20 p-3 rounded-full text-blue-400">👥</div>
+                <span class="text-sm font-medium">Data Karyawan</span>
+            </button>
+
+            <button onclick="window.location.href='/payroll'"
+                class="card-bg p-5 rounded-xl hover:bg-[#2d2d30] transition flex flex-col items-center justify-center gap-3">
+                <div class="bg-orange-500 bg-opacity-20 p-3 rounded-full text-orange-400">💸</div>
+                <span class="text-sm font-medium">Payroll</span>
+            </button>
+
+            <button class="card-bg p-5 rounded-xl hover:bg-[#2d2d30] transition flex flex-col items-center justify-center gap-3 opacity-50 cursor-not-allowed">
+                <div class="bg-green-500 bg-opacity-20 p-3 rounded-full text-green-400">🗓️</div>
+                <span class="text-sm font-medium">Cuti & Izin</span>
+            </button>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const userData = localStorage.getItem("hris_user");
+            if (userData) {
+                const user = JSON.parse(userData);
+                document.getElementById("userName").textContent = user.name;
+                document.getElementById("userRole").textContent = user.role;
+
+                // FIX: Logika untuk memunculkan tombol Manajemen User
+                if (user.role.toLowerCase() === "superadmin") {
+                    const btnUser = document.getElementById("btnUserManagement");
+                    if (btnUser) btnUser.classList.remove("hidden");
+                }
+            }
+
+            // Tampilkan Tanggal
+            const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+            document.getElementById("currentDate").textContent = new Date().toLocaleDateString("id-ID", options);
+
+            // Fetch Status Absen Hari Ini
+            try {
+                const response = await fetch("/api/attendance/today", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    const formatTime = (isoString) => {
+                        if (!isoString) return "--:--:--";
+                        return new Date(isoString).toLocaleTimeString("id-ID", {
+                            hour: "2-digit", minute: "2-digit", second: "2-digit",
+                        });
+                    };
+
+                    document.getElementById("timeIn").textContent = formatTime(data.clock_in_time);
+                    document.getElementById("timeOut").textContent = formatTime(data.clock_out_time);
+
+                    // LOGIKA TOMBOL ABSEN
+                    if (!data.clock_in_time) {
+                        document.getElementById("btnIn").classList.remove("hidden");
+                    } else if (!data.clock_out_time) {
+                        document.getElementById("btnOut").classList.remove("hidden");
+                    }
+                }
+            } catch (err) {
+                console.error("Gagal mengambil data absen hari ini");
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem("hris_token");
+            localStorage.removeItem("hris_user");
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+</html>
