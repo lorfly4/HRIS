@@ -74,6 +74,8 @@ app.get('/payroll', (req, res) => {
     res.render('payroll');
 });
 
+app.get('/leave', (req, res) => res.render('leave'));
+
 // Menjalankan server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
